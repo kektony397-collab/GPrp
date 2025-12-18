@@ -2,14 +2,14 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { db } from '../db';
-import { CompanyProfile, AppTheme, InvoiceTemplate } from '../types';
-import { Save, Building2, Palette, FileText, Phone, MapPin, Hash, Landmark, ShieldCheck } from 'lucide-react';
+import { CompanyProfile, AppTheme } from '../types';
+import { Save, Building2, Palette, ShieldCheck, ToggleLeft, ToggleRight, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const Settings: React.FC = () => {
   const { register, handleSubmit, setValue, watch } = useForm<CompanyProfile>();
   const currentTheme = watch('theme');
-  const currentTemplate = watch('invoiceTemplate');
+  const useDefaultGST = watch('useDefaultGST');
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -26,7 +26,7 @@ export const Settings: React.FC = () => {
   const onSubmit = async (data: CompanyProfile) => {
     try {
       await db.settings.put({ ...data, id: 1 });
-      toast.success('Professional Profile Synchronized');
+      toast.success('System Configuration Updated');
       setTimeout(() => window.location.reload(), 800); 
     } catch (error) {
       toast.error('Sync failed');
@@ -45,8 +45,8 @@ export const Settings: React.FC = () => {
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 px-2">
         <div>
-          <h2 className="text-4xl font-black text-slate-800 tracking-tighter">Business Infrastructure</h2>
-          <p className="text-slate-500 font-medium">Configure Gopi Distributor's professional identity</p>
+          <h2 className="text-4xl font-black text-slate-800 tracking-tighter">System Configuration</h2>
+          <p className="text-slate-500 font-medium">Manage default billing logic and identity</p>
         </div>
       </div>
 
@@ -84,20 +84,21 @@ export const Settings: React.FC = () => {
             </section>
 
             <section className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-              <div className="flex items-center gap-3 mb-8"><Landmark className="w-6 h-6 text-blue-600" /><h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Financial & Banking</h3></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Settlement Bank Name</label>
-                  <input {...register('bankName')} className="w-full rounded-2xl bg-slate-50 border-none px-6 py-4 font-bold" placeholder="e.g. HDFC Bank" />
+              <div className="flex items-center gap-3 mb-8"><Percent className="w-6 h-6 text-blue-600" /><h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Billing Logic</h3></div>
+              <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className={`p-3 rounded-2xl ${useDefaultGST ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-slate-800 uppercase text-xs tracking-widest">Universal 5% GST Mode</h4>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Force 5% GST on all medicines regardless of product settings</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Account Number</label>
-                  <input {...register('bankAccNo')} className="w-full rounded-2xl bg-slate-50 border-none px-6 py-4 font-mono font-bold" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Bank IFSC Code</label>
-                  <input {...register('bankIfsc')} className="w-full rounded-2xl bg-slate-50 border-none px-6 py-4 font-mono font-bold text-blue-600" />
-                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" {...register('useDefaultGST')} className="sr-only peer" />
+                  <div className="w-14 h-8 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
               </div>
             </section>
           </div>
@@ -135,7 +136,7 @@ export const Settings: React.FC = () => {
 
         <div className="flex justify-center md:justify-end sticky bottom-4 z-50">
           <button type="submit" className="flex items-center px-12 py-5 bg-blue-600 text-white font-black text-lg rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all ring-8 ring-white/80">
-            <Save className="w-6 h-6 mr-3" /> SYNCHRONIZE IDENTITY
+            <Save className="w-6 h-6 mr-3" /> UPDATE CONFIGURATION
           </button>
         </div>
       </form>

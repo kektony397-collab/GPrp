@@ -1,9 +1,9 @@
 
-import { Dexie } from 'dexie';
+import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import { Product, Party, Invoice, CompanyProfile } from './types';
 
-// AppDatabase class extending Dexie to manage the local IndexedDB
+// Define the database class extending Dexie to manage indexedDB tables with proper inheritance
 export class AppDatabase extends Dexie {
   products!: Table<Product>;
   parties!: Table<Party>;
@@ -12,7 +12,7 @@ export class AppDatabase extends Dexie {
 
   constructor() {
     super('GopiDistributorsDB');
-    // Using version().stores() to define the database schema and store structures
+    // Define the database schema and indexes
     this.version(1).stores({
       products: '++id, name, hsn, batch',
       parties: '++id, name, gstin',
@@ -22,9 +22,9 @@ export class AppDatabase extends Dexie {
   }
 }
 
-// Exporting a singleton instance of the database
 export const db = new AppDatabase();
 
+// Initialize the database with default settings if empty
 export const seedDatabase = async () => {
   try {
     const settingsCount = await db.settings.count();
@@ -44,10 +44,7 @@ export const seedDatabase = async () => {
         theme: 'blue',
         invoiceTemplate: 'authentic',
         useDefaultGST: true,
-        defaultGSTRate: 12,
-        bankName: 'HDFC BANK LTD',
-        bankAccNo: '50200021458796',
-        bankIfsc: 'HDFC0001425',
+        defaultGSTRate: 5,
         jurisdiction: 'Ahmedabad'
       });
     }

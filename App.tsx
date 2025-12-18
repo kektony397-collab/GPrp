@@ -18,9 +18,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // Open the database connection before seeding and initialization
-        // This ensures properties like 'open' and 'version' are available on the db instance
-        await db.open();
+        // Seed the database. Dexie automatically opens the connection on first access.
+        // Manual db.open() is typically not required and can cause type issues in some environments.
         await seedDatabase();
         setIsReady(true);
       } catch (err) {

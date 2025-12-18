@@ -33,7 +33,8 @@ export const Inventory: React.FC = () => {
         setValue(key as keyof Product, (editingProduct as any)[key]);
       });
     } else {
-      reset({ gstRate: GSTRate.GST_12 });
+      // Default GST set to 5% as per user request
+      reset({ gstRate: 5 });
     }
   }, [editingProduct, setValue, reset]);
 
@@ -61,7 +62,6 @@ export const Inventory: React.FC = () => {
     } catch (e) { toast.error('Error saving product'); }
   };
 
-  // Helper for Intelligent Field Mapping
   const getCellValue = (row: any, synonyms: string[]): any => {
     const keys = Object.keys(row);
     for (const s of synonyms) {
@@ -72,7 +72,6 @@ export const Inventory: React.FC = () => {
     return null;
   };
 
-  // Helper for Excel Date Conversion
   const formatExcelDate = (val: any): string => {
     if (!val) return '2026-01-01';
     if (typeof val === 'number') {
@@ -82,7 +81,6 @@ export const Inventory: React.FC = () => {
     return String(val).trim();
   };
 
-  // Helper for Number Sanitization
   const cleanNumber = (val: any, fallback = 0): number => {
     if (val === null || val === undefined) return fallback;
     const cleaned = String(val).replace(/[^\d.-]/g, '');
@@ -126,7 +124,7 @@ export const Inventory: React.FC = () => {
               batch: String(getCellValue(row, ['Batch', 'B.No', 'Lot No', 'Batch No']) || 'N/A'),
               expiry: formatExcelDate(getCellValue(row, ['Expiry', 'Exp', 'Exp Date', 'Validity'])),
               hsn: String(getCellValue(row, ['HSN', 'HSN Code', 'SAC']) || '3004'),
-              gstRate: cleanNumber(getCellValue(row, ['GST', 'GST%', 'Tax%', 'IGST']), 12),
+              gstRate: cleanNumber(getCellValue(row, ['GST', 'GST%', 'Tax%', 'IGST']), 5), // Default to 5 during import if missing
               mrp: mrp,
               oldMrp: cleanNumber(getCellValue(row, ['Old MRP', 'Previous MRP']), mrp),
               purchaseRate: cleanNumber(getCellValue(row, ['Purchase Rate', 'P.Rate', 'Cost Price', 'P.Price'])),
@@ -136,15 +134,12 @@ export const Inventory: React.FC = () => {
             };
           });
 
-          // Using bulkPut to avoid unique constraint errors if name/batch logic is added later
-          // For now bulkAdd is used for speed as per schema
           await db.products.bulkAdd(chunk);
           
           const processedCount = Math.min(i + CHUNK_SIZE, totalRows);
           setImportProgress(Math.round((processedCount / totalRows) * 100));
           setStats(s => ({ ...s, processed: processedCount }));
           
-          // Allow UI thread to breathe for large datasets
           await new Promise(r => setTimeout(r, 0));
         }
         
@@ -169,7 +164,7 @@ export const Inventory: React.FC = () => {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Inventory Dashboard</h2>
-            <p className="text-slate-500 text-sm">Engine optimized for 50,000+ records</p>
+            <p className="text-slate-500 text-sm">Engine optimized for medical stocks</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -187,7 +182,7 @@ export const Inventory: React.FC = () => {
             className="flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md transition-all font-bold disabled:opacity-50"
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Entry
+            New Medicine
           </button>
         </div>
       </div>
@@ -207,7 +202,6 @@ export const Inventory: React.FC = () => {
                 style={{ width: `${importProgress}%` }}
               ></div>
            </div>
-           <p className="text-[10px] text-slate-400 mt-2 italic">Please do not close the browser while processing large datasets...</p>
         </div>
       )}
 
@@ -267,13 +261,6 @@ export const Inventory: React.FC = () => {
                   </td>
                 </tr>
               ))}
-              {products?.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center text-slate-400 italic">
-                    No products found matching your search.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -283,13 +270,13 @@ export const Inventory: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-8 border-b border-slate-50">
-              <h3 className="text-2xl font-bold text-slate-800">{editingProduct ? 'Edit Profile' : 'New Product Profile'}</h3>
+              <h3 className="text-2xl font-bold text-slate-800">{editingProduct ? 'Edit Profile' : 'New Medicine Profile'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-6 h-6 text-slate-400" /></button>
             </div>
             <form onSubmit={handleSubmit(onSubmit)} className="p-8 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Product / Medicine Name</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Medicine Name</label>
                   <input {...register('name', { required: true })} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
@@ -303,36 +290,32 @@ export const Inventory: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">HSN Code</label>
-                  <input {...register('hsn')} className="w-full bg-slate-50 border-none rounded-2xl p-4" />
+                  <input {...register('hsn')} className="w-full bg-slate-50 border-none rounded-2xl p-4" defaultValue="3004" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Batch Number</label>
                   <input {...register('batch', { required: true })} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-mono" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Expiry Window</label>
-                  <input {...register('expiry', { required: true })} className="w-full bg-slate-50 border-none rounded-2xl p-4" placeholder="MM/YY or YYYY-MM-DD" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Expiry</label>
+                  <input {...register('expiry', { required: true })} className="w-full bg-slate-50 border-none rounded-2xl p-4" placeholder="MM/YY" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Maximum Retail Price</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">MRP</label>
                   <input type="number" step="0.01" {...register('mrp', { required: true })} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Wholesale Billing Rate</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Selling Rate</label>
                   <input type="number" step="0.01" {...register('saleRate', { required: true })} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-blue-600 focus:ring-blue-500" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Opening Stock</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Stock</label>
                   <input type="number" {...register('stock', { required: true })} className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Manufacturer</label>
-                  <input {...register('manufacturer')} className="w-full bg-slate-50 border-none rounded-2xl p-4" placeholder="Pharmaceutical Co." />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-slate-500 font-bold hover:text-slate-700 transition-colors">Dismiss</button>
-                <button type="submit" className="px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">Synchronize Entry</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-slate-500 font-bold">Dismiss</button>
+                <button type="submit" className="px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all">Synchronize Entry</button>
               </div>
             </form>
           </div>

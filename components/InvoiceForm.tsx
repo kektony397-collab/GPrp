@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { Party, Product, InvoiceItem, Invoice, CompanyProfile } from '../types';
-// Fix: Added ShieldCheck to lucide-react imports
 import { Search, Trash2, Printer, ShoppingBag, Truck, User, TruckIcon, ClipboardList, ShoppingCart, MessageSquare, ShieldCheck } from 'lucide-react';
 import { generateInvoicePDF } from '../utils/pdfGenerator';
 import { useNavigate } from 'react-router-dom';
@@ -34,7 +33,7 @@ export const InvoiceForm: React.FC = () => {
     const genId = async () => {
       const count = await db.invoices.count();
       const typeCode = invoiceType === 'RETAIL' ? 'RET' : 'TI';
-      setInvoiceNo(`${typeCode} -${count + 65}`); 
+      setInvoiceNo(`${typeCode}-${count + 65}`); 
     };
     genId();
   }, [invoiceType]);
@@ -45,7 +44,8 @@ export const InvoiceForm: React.FC = () => {
       return;
     }
 
-    const gstToUse = profile?.useDefaultGST ? (profile?.defaultGSTRate || 5) : product.gstRate;
+    // CRITICAL: Respect the 5% GST override from settings
+    const gstToUse = profile?.useDefaultGST ? 5 : product.gstRate;
 
     const newItem: InvoiceItem = {
       ...product,
@@ -61,12 +61,14 @@ export const InvoiceForm: React.FC = () => {
       igstAmount: 0,
       totalAmount: 0,
     };
-    setItems([...items, calculateRow(newItem, selectedParty, profile)]);
+    setItems([...items, calculateRow(newItem, selectedParty, profile, invoiceType)]);
     setShowProductDropdown(false);
     setProductSearch('');
   };
 
-  const calculateRow = (item: InvoiceItem, party: Party | null, prof: CompanyProfile | undefined): InvoiceItem => {
+  const calculateRow = (item: InvoiceItem, party: Party | null, prof: CompanyProfile | undefined, type: 'WHOLESALE' | 'RETAIL'): InvoiceItem => {
+    // In Retail, we often treat MRP as the base rate if saleRate is not defined, 
+    // but here we allow editing. We'll use saleRate for calculation as it represents the "current selling price".
     const baseAmount = item.saleRate * item.quantity;
     const discountAmount = (baseAmount * item.discountPercent) / 100;
     const taxableValue = baseAmount - discountAmount;
@@ -75,7 +77,7 @@ export const InvoiceForm: React.FC = () => {
     const buyerStateCode = party?.gstin?.trim().substring(0, 2) || sellerStateCode;
     
     const isInterState = sellerStateCode !== buyerStateCode;
-    const totalTaxRate = item.gstRate;
+    const totalTaxRate = prof?.useDefaultGST ? 5 : item.gstRate;
     const totalTaxAmount = (taxableValue * totalTaxRate) / 100;
     
     let sgst = 0, cgst = 0, igst = 0;
@@ -88,6 +90,7 @@ export const InvoiceForm: React.FC = () => {
 
     return {
       ...item,
+      gstRate: totalTaxRate,
       taxableValue,
       sgstAmount: sgst,
       cgstAmount: cgst,
@@ -99,15 +102,15 @@ export const InvoiceForm: React.FC = () => {
   const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
     const newItems = [...items];
     const item = { ...newItems[index], [field]: value };
-    newItems[index] = calculateRow(item, selectedParty, profile);
+    newItems[index] = calculateRow(item, selectedParty, profile, invoiceType);
     setItems(newItems);
   };
 
   useEffect(() => {
     if (items.length > 0) {
-      setItems(items.map(it => calculateRow(it, selectedParty, profile)));
+      setItems(items.map(it => calculateRow(it, selectedParty, profile, invoiceType)));
     }
-  }, [selectedParty]);
+  }, [selectedParty, invoiceType, profile?.useDefaultGST]);
 
   const totalTaxable = items.reduce((sum, i) => sum + i.taxableValue, 0);
   const totalCGST = items.reduce((sum, i) => sum + i.cgstAmount, 0);
@@ -122,7 +125,7 @@ export const InvoiceForm: React.FC = () => {
     const invoice: Invoice = {
       invoiceNo, date: new Date(invoiceDate).toISOString(), invoiceType,
       partyId: selectedParty?.id || 0,
-      partyName: selectedParty?.name || 'Cash Sale',
+      partyName: selectedParty?.name || (invoiceType === 'RETAIL' ? 'Walk-in Customer' : 'Cash Sale'),
       partyGstin: selectedParty?.gstin || '',
       partyAddress: selectedParty?.address || '',
       partyStateCode: selectedParty?.gstin?.substring(0, 2) || '24',
@@ -133,7 +136,6 @@ export const InvoiceForm: React.FC = () => {
     };
 
     try {
-      // Fix: Casting db to any to ensure the transaction property is correctly identified by TypeScript
       await (db as any).transaction('rw', [db.invoices, db.products], async () => {
         await db.invoices.add(invoice);
         for (const item of items) {
@@ -173,13 +175,13 @@ export const InvoiceForm: React.FC = () => {
         <div className="lg:col-span-3 space-y-8">
            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-8 relative z-30">
               <div className="space-y-5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Business Associate (Party)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{invoiceType === 'RETAIL' ? 'Customer Identification' : 'Business Associate (Party)'}</label>
                 <div className="relative">
                   <User className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
                   <input 
                     type="text" 
                     className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl outline-none border-2 border-transparent focus:border-blue-500 transition-all font-bold text-slate-800" 
-                    placeholder="Identify Purchaser..." 
+                    placeholder={invoiceType === 'RETAIL' ? "Customer Name / Phone..." : "Identify Purchaser..."} 
                     value={selectedParty ? selectedParty.name : partySearch} 
                     onChange={(e) => {setPartySearch(e.target.value); setSelectedParty(null); setShowPartyDropdown(true);}} 
                   />
@@ -250,7 +252,7 @@ export const InvoiceForm: React.FC = () => {
               <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-[11px] text-left">
                   <thead className="bg-slate-50 font-black uppercase text-slate-400 tracking-widest text-[9px] whitespace-nowrap">
-                    <tr><th className="p-5">Inventory Description</th><th className="p-3">Batch</th><th className="p-3">MRP</th><th className="p-3 text-center">Qty</th><th className="p-3 text-center">Fr</th><th className="p-3">Rate</th><th className="p-3 text-center">Disc%</th><th className="p-3 text-center">GST%</th><th className="p-5 text-right">Net</th><th className="p-3"></th></tr>
+                    <tr><th className="p-5">Inventory Description</th><th className="p-3">Batch</th><th className="p-3">MRP</th><th className="p-3 text-center">Qty</th>{invoiceType === 'WHOLESALE' && <th className="p-3 text-center">Fr</th>}<th className="p-3">{invoiceType === 'RETAIL' ? 'Selling' : 'Rate'}</th><th className="p-3 text-center">Disc%</th><th className="p-3 text-center">GST%</th><th className="p-5 text-right">Net</th><th className="p-3"></th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {items.map((item, idx) => (
@@ -259,7 +261,9 @@ export const InvoiceForm: React.FC = () => {
                         <td className="p-3"><input type="text" className="w-20 bg-white border border-slate-200 rounded-lg p-1.5 font-mono font-bold uppercase text-[10px]" value={item.batch} onChange={e => updateItem(idx, 'batch', e.target.value)} /></td>
                         <td className="p-3"><input type="number" step="0.01" className="w-16 bg-white border border-slate-200 rounded-lg p-1.5 text-[10px] font-bold" value={item.mrp} onChange={e => updateItem(idx, 'mrp', parseFloat(e.target.value)||0)} /></td>
                         <td className="p-3 text-center"><input type="number" className="w-12 bg-blue-50 rounded-lg p-1.5 font-black text-center text-[11px] text-blue-600" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value)||0)} /></td>
-                        <td className="p-3 text-center"><input type="number" className="w-10 bg-slate-50 rounded-lg p-1.5 text-center text-[10px] font-bold text-slate-400" value={item.freeQuantity} onChange={e => updateItem(idx, 'freeQuantity', parseInt(e.target.value)||0)} /></td>
+                        {invoiceType === 'WHOLESALE' && (
+                          <td className="p-3 text-center"><input type="number" className="w-10 bg-slate-50 rounded-lg p-1.5 text-center text-[10px] font-bold text-slate-400" value={item.freeQuantity} onChange={e => updateItem(idx, 'freeQuantity', parseInt(e.target.value)||0)} /></td>
+                        )}
                         <td className="p-3"><input type="number" step="0.01" className="w-20 bg-white border border-slate-200 rounded-lg p-1.5 text-[10px] font-bold" value={item.saleRate} onChange={e => updateItem(idx, 'saleRate', parseFloat(e.target.value)||0)} /></td>
                         <td className="p-3 text-center"><input type="number" className="w-10 bg-white border border-slate-200 rounded-lg p-1.5 text-center text-[10px] font-bold" value={item.discountPercent} onChange={e => updateItem(idx, 'discountPercent', parseFloat(e.target.value)||0)} /></td>
                         <td className="p-3 text-center font-black text-slate-500">{item.gstRate}%</td>
@@ -331,7 +335,7 @@ export const InvoiceForm: React.FC = () => {
              <ul className="text-[10px] space-y-3 text-blue-600/80 font-bold uppercase tracking-wide leading-relaxed">
                <li>• Verify Batch & Expiry precision before locking.</li>
                <li>• Original Copy serves as the final legal tender.</li>
-               <li>• Free units bypass taxable calculation.</li>
+               <li>• Universal 5% GST Mode: {profile?.useDefaultGST ? 'ENABLED' : 'DISABLED'}.</li>
                <li>• Rounding applied to the nearest rupee.</li>
              </ul>
            </div>

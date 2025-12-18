@@ -23,9 +23,6 @@ export interface CompanyProfile {
   phone: string;
   email: string;
   terms: string;
-  bankName?: string;
-  bankAccNo?: string;
-  bankIfsc?: string;
   jurisdiction?: string;
   theme?: AppTheme;
   invoiceTemplate?: InvoiceTemplate;
