@@ -1,6 +1,5 @@
 
-import Dexie from 'dexie';
-import type { Table } from 'dexie';
+import { Dexie, type Table } from 'dexie';
 import { Product, Party, Invoice, CompanyProfile } from './types';
 
 // Define the database class extending Dexie to manage indexedDB tables with proper inheritance
@@ -13,6 +12,7 @@ export class AppDatabase extends Dexie {
   constructor() {
     super('GopiDistributorsDB');
     // Define the database schema and indexes
+    // Using the named export { Dexie } instead of default export ensures TypeScript correctly identifies standard Dexie methods on the extended class
     this.version(1).stores({
       products: '++id, name, hsn, batch',
       parties: '++id, name, gstin',

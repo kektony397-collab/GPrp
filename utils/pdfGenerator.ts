@@ -60,9 +60,9 @@ export const generateInvoicePDF = async (invoice: Invoice, template: string = 'a
     format: 'a4' 
   });
 
-  const pageWidth = 210; // Forced A4 Width
-  const pageHeight = 297; // Forced A4 Height
-  const margin = 8; // Optimized Margin
+  const pageWidth = 210; 
+  const pageHeight = 297; 
+  const margin = 8; 
 
   // --- Background Watermark ---
   doc.setTextColor(252, 252, 252);
@@ -78,7 +78,7 @@ export const generateInvoicePDF = async (invoice: Invoice, template: string = 'a
   doc.setLineWidth(0.3);
   doc.rect(margin, margin, pageWidth - (margin * 2), pageHeight - (margin * 2));
 
-  // --- Top Header ---
+  // --- Header ---
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.text(`GSTIN: ${profile.gstin}`, margin + 2, margin + 5);
@@ -141,12 +141,17 @@ export const generateInvoicePDF = async (invoice: Invoice, template: string = 'a
   doc.line(margin, boxTop + 30, pageWidth - margin, boxTop + 30);
 
   // --- Optimized Item Table ---
-  // In retail mode, "Rate" is removed. MRP is the primary price column.
+  // Updated MRP Column to show both Old and New MRP if different
   const tableHeaders = isRetail 
-    ? [['S.N', 'ITEM DESCRIPTION', 'Batch', 'Exp', 'HSN', 'MRP', 'QTY', 'GST%', 'TOTAL']]
-    : [['S.N', 'ITEM DESCRIPTION', 'Batch', 'Exp', 'HSN', 'MRP', 'QTY', 'Fr.', 'RATE', 'Disc%', 'Taxable', 'GST%', 'TOTAL']];
+    ? [['S.N', 'ITEM DESCRIPTION', 'Batch', 'Exp', 'HSN', 'MRP (O/N)', 'QTY', 'GST%', 'TOTAL']]
+    : [['S.N', 'ITEM DESCRIPTION', 'Batch', 'Exp', 'HSN', 'MRP (O/N)', 'QTY', 'Fr.', 'RATE', 'Disc%', 'Taxable', 'GST%', 'TOTAL']];
 
   const tableBody = invoice.items.map((item, idx) => {
+    // Logic for New vs Old MRP display
+    const mrpDisplay = item.oldMrp && item.oldMrp !== item.mrp 
+      ? `N:${item.mrp.toFixed(2)}\nO:${item.oldMrp.toFixed(2)}` 
+      : item.mrp.toFixed(2);
+
     if (isRetail) {
       return [
         idx + 1,
@@ -154,7 +159,7 @@ export const generateInvoicePDF = async (invoice: Invoice, template: string = 'a
         item.batch,
         item.expiry,
         item.hsn,
-        item.mrp.toFixed(2),
+        mrpDisplay,
         item.quantity,
         item.gstRate.toFixed(0) + '%',
         item.totalAmount.toFixed(2)
@@ -166,7 +171,7 @@ export const generateInvoicePDF = async (invoice: Invoice, template: string = 'a
         item.batch,
         item.expiry,
         item.hsn,
-        item.mrp.toFixed(2),
+        mrpDisplay,
         item.quantity,
         item.freeQuantity || 0,
         item.saleRate.toFixed(2),
@@ -184,8 +189,8 @@ export const generateInvoicePDF = async (invoice: Invoice, template: string = 'a
     body: tableBody,
     theme: 'grid',
     styles: { 
-      fontSize: 8.5, 
-      cellPadding: 1.5, 
+      fontSize: 8, 
+      cellPadding: 1.2, 
       lineColor: [0, 0, 0], 
       lineWidth: 0.1, 
       textColor: [0, 0, 0],
@@ -199,10 +204,10 @@ export const generateInvoicePDF = async (invoice: Invoice, template: string = 'a
     },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: isRetail ? 85 : 52 }, 
-      5: { halign: 'right' },
+      1: { cellWidth: isRetail ? 82 : 48 }, 
+      5: { cellWidth: 18, halign: 'right', fontSize: 7.5 }, // MRP Column
       6: { halign: 'center' },
-      8: { halign: 'right' }
+      7: { halign: 'center' }
     },
     margin: { left: margin, right: margin },
     tableWidth: 'auto'
